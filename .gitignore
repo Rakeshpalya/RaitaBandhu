@@ -1,0 +1,39 @@
+# Node.js dependencies
+node_modules/
+
+# Vite build output
+client/dist/
+
+# Python virtual environments
+.venv/
+.venv310/
+ml-model/.venv/
+ml-model/__pycache__/
+
+# Python artifacts
+*.pyc
+__pycache__/
+*.pyo
+*.pyd
+
+# ML artifacts
+ml-model/catboost_info/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Editor files
+.vscode/
+.DS_Store
+
+# Dataset / data files
+*.csv
+
+# Local environment files
+.env
+client/.env
+backend/.env
+ml-model/.env
