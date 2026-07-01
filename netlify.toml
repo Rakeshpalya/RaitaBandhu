@@ -1,8 +1,9 @@
 [build]
   base = "client"
-  command = "npm install && npm run build"
+  command = "npm install --include=dev && npm run build"
   publish = "dist"
   functions = "client/netlify/functions"
 
 [context.production.environment]
   NODE_ENV = "production"
+  NPM_CONFIG_PRODUCTION = "false"
