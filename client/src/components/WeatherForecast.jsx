@@ -1,6 +1,18 @@
 ﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AreaChart, Area, XAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
-import { MapPin } from 'lucide-react';
+import { MapPin, Sun, Cloud, CloudRain, CloudLightning, SunMedium, Sparkles } from 'lucide-react';
+
+const getWeatherIcon = (code) => {
+  if (code === 0) return <Sun size={24} className="text-amber-300" />;
+  if (code === 1 || code === 2) return <SunMedium size={24} className="text-sky-300" />;
+  if (code === 3) return <Cloud size={24} className="text-slate-300" />;
+  if (code === 45 || code === 48) return <Cloud size={24} className="text-slate-400" />;
+  if ([51, 53, 55, 61, 63, 65, 80, 81, 82].includes(code)) return <CloudRain size={24} className="text-sky-300" />;
+  if ([66, 67].includes(code)) return <CloudRain size={24} className="text-cyan-300" />;
+  if ([71, 73, 75, 77, 85, 86].includes(code)) return <Sparkles size={24} className="text-slate-300" />;
+  if ([95, 96, 99].includes(code)) return <CloudLightning size={24} className="text-purple-300" />;
+  return <Cloud size={24} className="text-slate-400" />;
+};
 
 const WeatherForecast = ({ weatherData = {}, hourly72Forecast = [], weeklyForecast = [] }) => {
   const [visibleStart, setVisibleStart] = useState(0);
@@ -16,6 +28,7 @@ const WeatherForecast = ({ weatherData = {}, hourly72Forecast = [], weeklyForeca
     const safeStart = Math.min(Math.max(visibleStart, 0), Math.max(hourly72Forecast.length - visibleCount, 0));
     return hourly72Forecast.slice(safeStart, safeStart + visibleCount).map((hour, index) => ({
       ...hour,
+      icon: getWeatherIcon(hour.weatherCode),
       index,
     }));
   }, [hourly72Forecast, visibleStart]);

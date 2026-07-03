@@ -554,6 +554,7 @@ const HomeDashboard = () => {
       const url =
         `https://api.open-meteo.com/v1/forecast` +
         `?latitude=${lat}&longitude=${lon}` +
+        `&current_weather=true` +
         `&hourly=temperature_2m,relative_humidity_2m,rain,precipitation_probability,wind_speed_10m,wind_direction_10m,weather_code,cloud_cover` +
         `&daily=temperature_2m_max,temperature_2m_min,weather_code,wind_speed_10m_max,precipitation_sum,sunrise,sunset` +
         `&timezone=Asia%2FKolkata&forecast_days=7`;
@@ -601,27 +602,32 @@ const HomeDashboard = () => {
         return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       };
 
-      const now = new Date();
+      const pad = (value) => String(value).padStart(2, '0');
       const istNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
       const currentHour = istNow.getHours();
-      const todayStr = istNow.toISOString().split('T')[0];
-      let hourIdx = data.hourly.time.findIndex(t => t.startsWith(todayStr) && new Date(t).getHours() === currentHour);
+      const currentDate = `${istNow.getFullYear()}-${pad(istNow.getMonth() + 1)}-${pad(istNow.getDate())}`;
+
+      const parseLocalTime = (time) => new Date(`${time}:00+05:30`).getTime();
+      const targetTs = parseLocalTime(`${currentDate}T${pad(currentHour)}:00`);
+
+      let hourIdx = data.hourly.time.findIndex((t) => t === `${currentDate}T${pad(currentHour)}:00`);
       if (hourIdx < 0) {
-        const targetTime = istNow.getTime();
         const closest = data.hourly.time.reduce((best, time, idx) => {
-          const diff = Math.abs(new Date(time).getTime() - targetTime);
+          const diff = Math.abs(parseLocalTime(time) - targetTs);
           return best.diff === null || diff < best.diff ? { idx, diff } : best;
         }, { idx: -1, diff: null });
         hourIdx = closest.idx;
       }
+
       const safeIdx = typeof hourIdx === 'number' && hourIdx >= 0 ? hourIdx : 0;
 
+      const currentWeather = data.current_weather || {};
       const todayDailyIdx = 0;
       const sunriseTime = formatTime(data.daily.sunrise[todayDailyIdx]);
       const sunsetTime = formatTime(data.daily.sunset[todayDailyIdx]);
-      const sunriseDate = new Date(data.daily.sunrise[todayDailyIdx]);
-      const sunsetDate = new Date(data.daily.sunset[todayDailyIdx]);
-      const isDayTime = now >= sunriseDate && now <= sunsetDate;
+      const sunriseHour = parseInt(data.daily.sunrise[todayDailyIdx].split('T')[1].split(':')[0], 10);
+      const sunsetHour = parseInt(data.daily.sunset[todayDailyIdx].split('T')[1].split(':')[0], 10);
+      const isDayTime = currentHour >= sunriseHour && currentHour < sunsetHour;
 
       let locationName = 'My Location, India';
       try {
@@ -635,13 +641,13 @@ const HomeDashboard = () => {
 
       setWeatherCoords({ lat, lon });
       setWeatherData({
-        temp: Math.round(data.hourly.temperature_2m[safeIdx]),
+        temp: Math.round(currentWeather.temperature ?? data.hourly.temperature_2m[safeIdx]),
         humidity: data.hourly.relative_humidity_2m[safeIdx],
-        wind: Math.round(data.hourly.wind_speed_10m[safeIdx]),
-        windDir: degToCompass(data.hourly.wind_direction_10m[safeIdx]),
+        wind: Math.round(currentWeather.windspeed ?? data.hourly.wind_speed_10m[safeIdx]),
+        windDir: degToCompass(currentWeather.winddirection ?? data.hourly.wind_direction_10m[safeIdx]),
         rain: Math.round((data.hourly.rain[safeIdx] || 0) * 10) / 10,
         rainChance: Math.round(data.hourly.precipitation_probability[safeIdx] || 0),
-        description: codeToDesc(data.hourly.weather_code[safeIdx]),
+        description: codeToDesc(currentWeather.weathercode ?? data.hourly.weather_code[safeIdx]),
         location: locationName,
         sunrise: sunriseTime,
         sunset: sunsetTime,
@@ -942,34 +948,68 @@ const CropAnalysis = () => {
     (import.meta.env.DEV && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? localMlUrl : '');
 
   const buildFallbackPredictions = (category, values) => {
+    const categoryMap = {
+      'Food Grains': 'Cereals',
+      'Oil Seeds': 'Oilseeds',
+      'Plantation': 'Plantation',
+      'Flowers': 'Flowers',
+      'Fruits': 'Fruits',
+      'Vegetables': 'Vegetables',
+      'All': 'All'
+    };
+    const normalizedCategory = categoryMap[category] || category;
+
     const candidates = [
       { crop: 'Rice', category: 'Cereals', base: 0.24 },
       { crop: 'Wheat', category: 'Cereals', base: 0.22 },
-      { crop: 'Tomato', category: 'Vegetables', base: 0.20 },
-      { crop: 'Onion', category: 'Vegetables', base: 0.19 },
-      { crop: 'Banana', category: 'Fruits', base: 0.18 },
-      { crop: 'Mango', category: 'Fruits', base: 0.17 },
-      { crop: 'Groundnut', category: 'Oilseeds', base: 0.16 },
-      { crop: 'Cotton', category: 'Cash Crops', base: 0.15 },
-      { crop: 'Rose', category: 'Flowers', base: 0.14 }
+      { crop: 'Maize', category: 'Cereals', base: 0.21 },
+      { crop: 'Sorghum', category: 'Cereals', base: 0.19 },
+      { crop: 'Tomato', category: 'Vegetables', base: 0.22 },
+      { crop: 'Onion', category: 'Vegetables', base: 0.21 },
+      { crop: 'Potato', category: 'Vegetables', base: 0.20 },
+      { crop: 'Brinjal', category: 'Vegetables', base: 0.19 },
+      { crop: 'Cabbage', category: 'Vegetables', base: 0.18 },
+      { crop: 'Banana', category: 'Fruits', base: 0.22 },
+      { crop: 'Mango', category: 'Fruits', base: 0.21 },
+      { crop: 'Guava', category: 'Fruits', base: 0.20 },
+      { crop: 'Papaya', category: 'Fruits', base: 0.19 },
+      { crop: 'Pomegranate', category: 'Fruits', base: 0.18 },
+      { crop: 'Rose', category: 'Flowers', base: 0.22 },
+      { crop: 'Sunflower', category: 'Flowers', base: 0.21 },
+      { crop: 'Marigold', category: 'Flowers', base: 0.20 },
+      { crop: 'Jasmine', category: 'Flowers', base: 0.19 },
+      { crop: 'Chrysanthemum', category: 'Flowers', base: 0.18 },
+      { crop: 'Groundnut', category: 'Oilseeds', base: 0.20 },
+      { crop: 'Sesame', category: 'Oilseeds', base: 0.19 },
+      { crop: 'Castor', category: 'Oilseeds', base: 0.18 },
+      { crop: 'Coconut', category: 'Plantation', base: 0.21 },
+      { crop: 'Arecanut', category: 'Plantation', base: 0.20 },
+      { crop: 'Coffee', category: 'Plantation', base: 0.19 }
     ];
+
+    const filteredCandidates = normalizedCategory === 'All'
+      ? candidates
+      : candidates.filter((item) => item.category.toLowerCase() === normalizedCategory.toLowerCase());
+
+    const chosenCandidates = filteredCandidates.length ? filteredCandidates : candidates;
 
     return {
       status: 'success',
-      top_5: candidates
+      top_5: chosenCandidates
         .map((item) => {
           let score = item.base;
-          if (category !== 'All' && item.category.toLowerCase().includes(category.toLowerCase())) score += 0.05;
+          if (item.category.toLowerCase() === normalizedCategory.toLowerCase()) score += 0.08;
           if (values.Temperature > 30) score += 0.02;
-          if (values.Rainfall > 80) score += 0.02;
-          if (values.Humidity > 60) score += 0.01;
+          if (values.Rainfall > 80) score += 0.03;
+          if (values.Humidity > 60) score += 0.02;
+          if (values.Soil_pH >= 6 && values.Soil_pH <= 7) score += 0.02;
           return {
             crop: item.crop,
             category: item.category,
-            probability: Math.min(0.99, parseFloat((score).toFixed(3))),
-            match: `${Math.min(99, Math.round(score * 100) + 70)}% Match`,
-            profit: score > 0.18 ? 'High Profit' : 'Good Profit',
-            demand: score > 0.16 ? 'High Demand' : 'Good Demand'
+            probability: Math.min(0.99, parseFloat(score.toFixed(3))),
+            match: `${Math.min(99, Math.round(score * 100) + 65)}% Match`,
+            profit: score > 0.20 ? 'High Profit' : 'Good Profit',
+            demand: score > 0.18 ? 'High Demand' : 'Good Demand'
           };
         })
         .sort((a, b) => b.probability - a.probability)
