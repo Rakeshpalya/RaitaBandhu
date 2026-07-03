@@ -1,13 +1,14 @@
 import React, { useState, useEffect, createContext, useContext, useRef, useCallback } from 'react';
 import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { 
-  Sprout, Sun, CloudRain, MapPin, Menu, Search, 
+  Sprout, Sun, Cloud, CloudRain, MapPin, Menu, Search, 
   ChevronLeft, Bell, User, CheckCircle2, Droplets, Bug, 
   Wind, Map, ShieldCheck, Droplet, SunMedium, Heart, X, Moon, LogOut, AlertTriangle, CloudLightning
 } from 'lucide-react';
 import { AreaChart, Area, XAxis, Tooltip, ResponsiveContainer, BarChart, Bar, Legend, PieChart, Pie, Cell, LineChart, Line, YAxis, CartesianGrid } from 'recharts';
 import { auth } from './firebase';
 import { RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth';
+import WeatherForecast from './components/WeatherForecast';
 // --- Contexts ---
 const LangContext = createContext();
 const ThemeContext = createContext();
@@ -543,6 +544,8 @@ const HomeDashboard = () => {
   });
   const [weeklyForecast, setWeeklyForecast] = useState([]);
   const [trendData, setTrendData] = useState([]);
+  const [hourly72Forecast, setHourly72Forecast] = useState([]);
+  const [weatherCoords, setWeatherCoords] = useState({ lat: 13.3379, lon: 77.1173 });
 
   // --- Open-Meteo API Integration ---
   const fetchWeather = useCallback(async (lat, lon) => {
@@ -551,7 +554,7 @@ const HomeDashboard = () => {
       const url =
         `https://api.open-meteo.com/v1/forecast` +
         `?latitude=${lat}&longitude=${lon}` +
-        `&hourly=temperature_2m,relative_humidity_2m,rain,wind_speed_10m,wind_direction_10m,weather_code,cloud_cover` +
+        `&hourly=temperature_2m,relative_humidity_2m,rain,precipitation_probability,wind_speed_10m,wind_direction_10m,weather_code,cloud_cover` +
         `&daily=temperature_2m_max,temperature_2m_min,weather_code,wind_speed_10m_max,precipitation_sum,sunrise,sunset` +
         `&timezone=Asia%2FKolkata&forecast_days=7`;
 
@@ -560,26 +563,32 @@ const HomeDashboard = () => {
       const data = await res.json();
 
       const codeToDesc = (code) => {
-        if (code === 0) return 'Clear Sky';
-        if (code <= 2) return 'Partly Cloudy';
+        if (code === 0) return 'Clear';
+        if (code === 1) return 'Mainly clear';
+        if (code === 2) return 'Partly cloudy';
         if (code === 3) return 'Overcast';
-        if (code <= 49) return 'Foggy';
-        if (code <= 59) return 'Drizzle';
-        if (code <= 69) return 'Rain';
-        if (code <= 79) return 'Snow';
-        if (code <= 82) return 'Rain Showers';
-        if (code <= 95) return 'Thunderstorm';
-        return 'Heavy Storm';
+        if (code === 45 || code === 48) return 'Fog';
+        if ([51, 53, 55].includes(code)) return 'Drizzle';
+        if ([56, 57].includes(code)) return 'Freezing drizzle';
+        if ([61, 63, 65].includes(code)) return 'Rain';
+        if ([66, 67].includes(code)) return 'Freezing rain';
+        if ([71, 73, 75].includes(code)) return 'Snow';
+        if (code === 77) return 'Snow grains';
+        if ([80, 81, 82].includes(code)) return 'Rain showers';
+        if ([85, 86].includes(code)) return 'Snow showers';
+        if ([95, 96, 99].includes(code)) return 'Thunderstorm';
+        return 'Weather';
       };
 
       const codeToIcon = (code) => {
-        if (code === 0) return <Sun size={32} className="text-yellow-400" />;
-        if (code <= 2) return <SunMedium size={32} className="text-yellow-400" />;
-        if (code <= 3) return <SunMedium size={32} className="text-gray-400" />;
-        if (code <= 59) return <CloudRain size={32} className="text-gray-300" />;
-        if (code <= 69) return <CloudRain size={32} className="text-blue-300" />;
-        if (code <= 95) return <CloudLightning size={32} className="text-purple-400" />;
-        return <CloudLightning size={32} className="text-red-400" />;
+        if (code === 0) return <Sun size={32} className="text-yellow-300 drop-shadow-[0_0_12px_rgba(253,211,116,0.45)]" />;
+        if (code === 1 || code === 2) return <SunMedium size={32} className="text-amber-400 drop-shadow-[0_0_12px_rgba(251,191,36,0.35)]" />;
+        if (code === 3) return <Cloud size={32} className="text-slate-300 drop-shadow-[0_0_16px_rgba(148,163,184,0.35)]" />;
+        if (code === 45 || code === 48) return <Cloud size={32} className="text-slate-400 drop-shadow-[0_0_16px_rgba(148,163,184,0.35)]" />;
+        if ([51, 53, 55, 61, 63, 65, 66, 67, 80, 81, 82].includes(code)) return <CloudRain size={32} className="text-sky-400 drop-shadow-[0_0_16px_rgba(56,189,248,0.25)]" />;
+        if ([71, 73, 75, 77, 85, 86].includes(code)) return <CloudRain size={32} className="text-slate-300 drop-shadow-[0_0_16px_rgba(148,163,184,0.35)]" />;
+        if ([95, 96, 99].includes(code)) return <CloudLightning size={32} className="text-purple-400 drop-shadow-[0_0_16px_rgba(167,139,250,0.25)]" />;
+        return <Cloud size={32} className="text-slate-300 drop-shadow-[0_0_16px_rgba(148,163,184,0.35)]" />;
       };
 
       const degToCompass = (deg) => {
@@ -593,10 +602,19 @@ const HomeDashboard = () => {
       };
 
       const now = new Date();
-      const currentHour = now.getHours();
-      const todayStr = now.toISOString().split('T')[0];
-      const hourIdx = data.hourly.time.findIndex(t => t.startsWith(todayStr) && new Date(t).getHours() === currentHour);
-      const safeIdx = hourIdx >= 0 ? hourIdx : 0;
+      const istNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+      const currentHour = istNow.getHours();
+      const todayStr = istNow.toISOString().split('T')[0];
+      let hourIdx = data.hourly.time.findIndex(t => t.startsWith(todayStr) && new Date(t).getHours() === currentHour);
+      if (hourIdx < 0) {
+        const targetTime = istNow.getTime();
+        const closest = data.hourly.time.reduce((best, time, idx) => {
+          const diff = Math.abs(new Date(time).getTime() - targetTime);
+          return best.diff === null || diff < best.diff ? { idx, diff } : best;
+        }, { idx: -1, diff: null });
+        hourIdx = closest.idx;
+      }
+      const safeIdx = typeof hourIdx === 'number' && hourIdx >= 0 ? hourIdx : 0;
 
       const todayDailyIdx = 0;
       const sunriseTime = formatTime(data.daily.sunrise[todayDailyIdx]);
@@ -615,12 +633,14 @@ const HomeDashboard = () => {
         else locationName = state;
       } catch(e) {}
 
+      setWeatherCoords({ lat, lon });
       setWeatherData({
         temp: Math.round(data.hourly.temperature_2m[safeIdx]),
         humidity: data.hourly.relative_humidity_2m[safeIdx],
         wind: Math.round(data.hourly.wind_speed_10m[safeIdx]),
         windDir: degToCompass(data.hourly.wind_direction_10m[safeIdx]),
-        rain: data.hourly.rain[safeIdx],
+        rain: Math.round((data.hourly.rain[safeIdx] || 0) * 10) / 10,
+        rainChance: Math.round(data.hourly.precipitation_probability[safeIdx] || 0),
         description: codeToDesc(data.hourly.weather_code[safeIdx]),
         location: locationName,
         sunrise: sunriseTime,
@@ -644,6 +664,20 @@ const HomeDashboard = () => {
       });
       setWeeklyForecast(forecast7);
 
+      const hourlyForecast = data.hourly.time.map((time, idx) => {
+        const d = new Date(time);
+        return {
+          time: d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          temp: Math.round(data.hourly.temperature_2m[idx]),
+          rainAmount: Math.round((data.hourly.rain[idx] || 0) * 10) / 10,
+          rainChance: Math.round(data.hourly.precipitation_probability[idx] || 0),
+          icon: codeToIcon(data.hourly.weather_code[idx]),
+          description: codeToDesc(data.hourly.weather_code[idx]),
+          weatherCode: data.hourly.weather_code[idx]
+        };
+      }).slice(hourIdx, hourIdx + 24 * 3);
+      setHourly72Forecast(hourlyForecast);
+
       const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
       const trend = data.daily.time.map((dateStr, i) => {
         const d = new Date(dateStr);
@@ -652,7 +686,8 @@ const HomeDashboard = () => {
       setTrendData(trend);
 
     } catch (err) {
-      setWeatherData(prev => ({ ...prev, loading: false, error: true }));
+      console.error('Weather fetch failed:', err);
+      setWeatherData(prev => ({ ...prev, loading: false, error: true, errorMessage: err.message || 'Unknown error' }));
     }
   }, []);
 
@@ -738,7 +773,7 @@ const HomeDashboard = () => {
           )}
           {/* Error banner */}
           {weatherData.error && (
-            <p className="text-xs text-red-400 font-semibold text-center mb-2">⚠ Could not load live weather. Showing last known data.</p>
+            <p className="text-xs text-red-400 font-semibold text-center mb-2">⚠ Could not load live weather. Showing last known data. {weatherData.errorMessage}</p>
           )}
           <div className="flex flex-col md:flex-row justify-between items-center mb-6">
              <div className="flex items-center">
@@ -877,6 +912,8 @@ const HomeDashboard = () => {
             )}
         </div>
 
+        <WeatherForecast weatherData={weatherData} hourly72Forecast={hourly72Forecast} weeklyForecast={weeklyForecast} />
+
       </div>
     </div>
   );
@@ -986,7 +1023,23 @@ const ResultPage = () => {
   const apiData = location.state?.predictionData?.top_5;
 
   const getEmoji = (name) => {
-      const mapping = { 'Rose': '🌸', 'Marigold': '🌼', 'Coconut': '🥥', 'Banana': '🍌', 'Tomato': '🍅', 'Potato': '🥔', 'Sunflower': '🌻', 'Arecanut': '🌴', 'Mango': '🥭', 'Papaya': '🍈', 'Groundnut': '🥜', 'Onion': '🧅', 'Grapes': '🍇' };
+      const mapping = {
+        'Rose': '🌹',
+        'Sunflower': '🌻',
+        'Chrysanthemum': '🌼',
+        'Jasmine': '🌺',
+        'Marigold': '🌼',
+        'Coconut': '🥥',
+        'Banana': '🍌',
+        'Tomato': '🍅',
+        'Potato': '🥔',
+        'Arecanut': '🌴',
+        'Mango': '🥭',
+        'Papaya': '🍍',
+        'Groundnut': '🥜',
+        'Onion': '🧅',
+        'Grapes': '🍇'
+      };
       return mapping[name] || '🌱';
   };
 
