@@ -885,7 +885,7 @@ const HomeDashboard = () => {
                 <div className="w-8 h-8 border-4 border-white/50 border-t-transparent rounded-full animate-spin"></div>
               </div>
             ) : (
-            <div className="grid grid-cols-7 gap-1 md:gap-2 divide-x divide-white/10 relative z-10">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-1 md:gap-2 divide-x divide-white/10 relative z-10">
                {weeklyForecast.map((day, idx) => (
                   <div key={idx} className={`flex flex-col items-center justify-between text-white py-3 transition-colors cursor-pointer ${idx === 0 ? 'bg-white/10 rounded-2xl' : 'hover:bg-white/5 rounded-2xl'}`}>
                      <div className="text-center mb-4">
@@ -935,12 +935,20 @@ const CropAnalysis = () => {
     Soil_pH: 6.5
   });
 
-  const mlApiUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:5000/api/predict';
+  const localMlUrl = 'http://127.0.0.1:5000/api/predict';
+  const mlApiUrl =
+    import.meta.env.VITE_API_URL ||
+    import.meta.env.VITE_ML_API_URL ||
+    (import.meta.env.DEV && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? localMlUrl : '');
 
   const handleAnalyze = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
+      if (!mlApiUrl) {
+        throw new Error('ML API URL is not configured for this deployment. Set VITE_API_URL or VITE_ML_API_URL in your environment.');
+      }
+
       const response = await fetch(mlApiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -952,13 +960,23 @@ const CropAnalysis = () => {
            Category: targetCategory
         }),
       });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`ML server returned ${response.status}: ${errorText}`);
+      }
+
       const data = await response.json();
       setLoading(false);
       navigate('/result', { state: { predictionData: data, category: targetCategory } });
     } catch (error) {
-      console.error("Analysis failed", error);
+      console.error('Analysis failed', error);
       setLoading(false);
-      alert("Could not reach ML server. Make sure the Python backend is running on port 5000.");
+      alert(
+        error.message.includes('ML API URL is not configured')
+          ? 'ML backend is not configured for this deployed site. Set VITE_API_URL or VITE_ML_API_URL to your backend predict endpoint.'
+          : `Could not reach the ML server at ${mlApiUrl || 'configured URL'}. Please verify your backend URL and network connectivity.`
+      );
     }
   };
 

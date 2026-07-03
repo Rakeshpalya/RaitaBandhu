@@ -132,9 +132,9 @@ const WeatherForecast = ({ weatherData = {}, hourly72Forecast = [], weeklyForeca
             const newIndex = Math.round(scrollLeft / cardWidth);
             setVisibleStart(newIndex);
           }}>
-            <div className="min-w-[1040px] flex items-center gap-3 rounded-[24px] border border-white/10 bg-slate-950/80 p-3 text-slate-300">
+            <div className="min-w-full md:min-w-[1040px] flex items-center gap-3 rounded-[24px] border border-white/10 bg-slate-950/80 p-3 text-slate-300">
               {hourly72Forecast.map((point) => (
-                <div key={`${point.time}-${point.temp}`} className="flex min-w-[96px] flex-col items-center gap-2 rounded-3xl bg-slate-900/80 px-3 py-4 text-center">
+                <div key={`${point.time}-${point.temp}`} className="flex min-w-[90px] flex-col items-center gap-2 rounded-3xl bg-slate-900/80 px-3 py-4 text-center">
                   <span className="text-[10px] uppercase tracking-[0.28em] text-slate-500">{point.time}</span>
                   <div className="flex h-12 w-12 items-center justify-center rounded-3xl bg-slate-800/90 shadow-sm">
                     {point.icon}
