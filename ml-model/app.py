@@ -6,7 +6,7 @@ import joblib
 import json
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, resources={r"/*": {"origins": "*"}})
 
 BASE_DIR = Path(__file__).resolve().parent
 

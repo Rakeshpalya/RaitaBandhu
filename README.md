@@ -33,10 +33,10 @@ If you are on Windows, simply double click the `start.bat` file located in the r
 **1. Start the Machine Learning API**
 ```bash
 cd ml-model
-pip install -r requirements.txt  # (flask, pandas, scikit-learn, xgboost, joblib)
+pip install -r requirements.txt
 python app.py
 ```
-*(Runs on http://localhost:5000)*
+*(Runs on http://localhost:5000 unless you set a different backend host)*
 
 **2. Start the Node.js Backend**
 ```bash
@@ -53,6 +53,12 @@ npm install
 npm run dev
 ```
 *(Runs on http://localhost:5173)*
+
+If you deploy the frontend to Netlify, set the `VITE_API_URL` environment variable to your hosted backend URL, for example:
+
+```bash
+VITE_API_URL=https://your-backend-url.onrender.com/api/predict
+```
 
 ---
 

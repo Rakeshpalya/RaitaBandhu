@@ -898,12 +898,13 @@ const CropAnalysis = () => {
     Soil_pH: 6.5
   });
 
+  const mlApiUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:5000/api/predict';
+
   const handleAnalyze = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
-      // Calls the Flask ML backend running at port 5000 (127.0.0.1 avoids IPv6 localhost issues)
-      const response = await fetch('http://127.0.0.1:5000/api/predict', {
+      const response = await fetch(mlApiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
